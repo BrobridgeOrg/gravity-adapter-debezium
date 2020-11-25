@@ -5,14 +5,18 @@
 			"configs": {
 				"connector.class": "io.debezium.connector.postgresql.PostgresConnector",
 				"tasks.max": "1",
-				"database.hostname": "0.0.0.0",
+				"database.hostname": "docker.for.mac.host.internal",
 				"database.port": "32768",
 				"database.dbname": "gravity",
 				"database.user": "postgres",
 				"database.password": "1qazXSW@",
-				"database.server.name" : "postgres"
+				"database.server.name" : "postgres",
+				"plugin.name": "pgoutput"
 			},
-			"kafka.hosts": "0.0.0.0:9092"
+			"kafka.hosts": "0.0.0.0:29092",
+			"tables": [
+				"datasource"
+			]
 		}
 	}
 }

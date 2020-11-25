@@ -9,7 +9,6 @@ import (
 	debezium_connector "github.com/BrobridgeOrg/gravity-adapter-debezium/pkg/debezium-connector/service"
 	kafka_connector "github.com/BrobridgeOrg/gravity-adapter-debezium/pkg/kafka-connector/service"
 	dsa "github.com/BrobridgeOrg/gravity-api/service/dsa"
-	"github.com/Shopify/sarama"
 	parallel_chunked_flow "github.com/cfsghost/parallel-chunked-flow"
 	jsoniter "github.com/json-iterator/go"
 	log "github.com/sirupsen/logrus"
@@ -37,6 +36,7 @@ type Source struct {
 	name              string
 	host              string
 	kafkaHosts        []string
+	tables            []string
 	configs           map[string]interface{}
 	parser            *parallel_chunked_flow.ParallelChunkedFlow
 }
@@ -114,52 +114,68 @@ func NewSource(adapter *Adapter, name string, sourceInfo *SourceInfo) *Source {
 		host:       info.Host,
 		kafkaHosts: strings.Split(info.KafkaHosts, ","),
 		configs:    info.Configs,
+		tables:     info.Tables,
 		parser:     parallel_chunked_flow.NewParallelChunkedFlow(&pcfOpts),
 	}
 }
 
 func (source *Source) InitSubscription() error {
 
-	databaseServerName := source.configs["database.server.name"].(string)
-
 	log.WithFields(log.Fields{
 		"source":      source.name,
-		"database":    databaseServerName,
 		"client_name": source.adapter.clientName + "-" + source.name,
-	}).Info("Initializing subscribers ...")
+	}).Info("Initializing subscriber ...")
 
-	consumer := source.kafkaConnector.GetConsumer()
+	databaseServerName := source.configs["database.server.name"].(string)
 
-	// Get list of partitions for specific topic
-	partitionList, err := consumer.Partitions(databaseServerName + ".inventory.customers")
-	if err != nil {
-		return err
+	// Preparing topics
+	topics := make([]string, 0, len(source.tables))
+	for _, tableName := range source.tables {
+		topics = append(topics, databaseServerName+".public."+tableName)
 	}
 
-	// Initializing consumers
-	consumerName := source.adapter.clientName + "-" + source.name
-	for partition := range partitionList {
-		pc, err := consumer.ConsumePartition(consumerName, int32(partition), sarama.OffsetNewest)
-		if err != nil {
-			return err
-		}
+	group := source.kafkaConnector.GetConsumerGroup()
 
-		go func(pc sarama.PartitionConsumer) {
-			defer pc.AsyncClose()
+	// Setup consumer
+	go func() {
+		consumer := NewConsumer()
 
-			for msg := range pc.Messages() {
-				log.Info(string(msg.Value))
-				//				source.incoming <- msg.Value
+		for {
+			ctx := context.Background()
+			err := group.Consume(ctx, topics, consumer)
+			if err != nil {
+				log.Error(err)
 			}
-		}(pc)
-	}
+
+			if ctx.Err() != nil {
+				log.Error("Kafka Consumer timeout")
+			}
+		}
+	}()
 
 	return source.InitDebezium()
 }
 
 func (source *Source) InitDebezium() error {
 
-	log.Info("Registering inventory connector to debezium")
+	log.WithFields(log.Fields{
+		"connector": source.name,
+		"class":     source.configs["connector.class"].(string),
+	}).Info("Checking inventory connector")
+	ic, err := source.debeziumConnector.GetConfigs()
+	if err != nil {
+		return err
+	}
+
+	if ic != nil {
+		log.Info("Replacing inventory connector with new configs")
+		err := source.debeziumConnector.Delete()
+		if err != nil {
+			return err
+		}
+	} else {
+		log.Info("Registering inventory connector to debezium")
+	}
 
 	return source.debeziumConnector.Register(source.configs)
 }
@@ -181,7 +197,9 @@ func (source *Source) Init() error {
 		"hosts":  source.kafkaHosts,
 	}).Info("Initializing kafka connector")
 
-	options := kafka_connector.Options{}
+	options := kafka_connector.Options{
+		ClientName: source.adapter.clientName + "-" + source.name,
+	}
 	c := kafka_connector.NewConnector(source.kafkaHosts, options)
 	err := c.Connect()
 	if err != nil {

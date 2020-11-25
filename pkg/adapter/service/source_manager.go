@@ -13,10 +13,10 @@ type SourceConfig struct {
 }
 
 type SourceInfo struct {
-	Host               string                 `json:"host"`
-	KafkaHosts         string                 `json:"kafka.hosts"`
-	DatabaseServerName string                 `json:"database.server.name"`
-	Configs            map[string]interface{} `json:"configs"`
+	Host       string                 `json:"host"`
+	KafkaHosts string                 `json:"kafka.hosts"`
+	Tables     []string               `json:"tables"`
+	Configs    map[string]interface{} `json:"configs"`
 }
 
 type SourceManager struct {

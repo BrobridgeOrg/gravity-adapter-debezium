@@ -6,21 +6,24 @@ import (
 )
 
 type Options struct {
+	ClientName string
 }
 
 type Connector struct {
-	consumer sarama.Consumer
-	hosts    []string
+	options Options
+	group   sarama.ConsumerGroup
+	hosts   []string
 }
 
 func NewConnector(hosts []string, options Options) *Connector {
 	return &Connector{
-		consumer: nil,
-		hosts:    hosts,
+		hosts:   hosts,
+		options: options,
 	}
 }
 
 func (connector *Connector) Connect() error {
+
 	log.WithFields(log.Fields{
 		"hosts": connector.hosts,
 	}).Info("Connecting to Kafka server")
@@ -28,16 +31,16 @@ func (connector *Connector) Connect() error {
 	config := sarama.NewConfig()
 
 	// Connect to kafka
-	consumer, err := sarama.NewConsumer(connector.hosts, config)
+	group, err := sarama.NewConsumerGroup(connector.hosts, connector.options.ClientName, config)
 	if err != nil {
 		return err
 	}
 
-	connector.consumer = consumer
+	connector.group = group
 
 	return nil
 }
 
-func (connector *Connector) GetConsumer() sarama.Consumer {
-	return connector.consumer
+func (connector *Connector) GetConsumerGroup() sarama.ConsumerGroup {
+	return connector.group
 }
