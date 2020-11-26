@@ -10,7 +10,10 @@
 				"database.dbname": "gravity",
 				"database.user": "postgres",
 				"database.password": "1qazXSW@",
-				"database.server.name" : "postgres",
+				"database.server.name" : "postgres_6",
+				"snapshot.mode": "exported",
+				"snapshot.delay.ms": 100,
+				"table.include.list": "public.datasource",
 				"plugin.name": "pgoutput"
 			},
 			"kafka.hosts": "0.0.0.0:29092",

@@ -121,6 +121,11 @@ func NewSource(adapter *Adapter, name string, sourceInfo *SourceInfo) *Source {
 
 func (source *Source) InitSubscription() error {
 
+	err := source.InitDebezium()
+	if err != nil {
+		return err
+	}
+
 	log.WithFields(log.Fields{
 		"source":      source.name,
 		"client_name": source.adapter.clientName + "-" + source.name,
@@ -153,7 +158,7 @@ func (source *Source) InitSubscription() error {
 		}
 	}()
 
-	return source.InitDebezium()
+	return nil
 }
 
 func (source *Source) InitDebezium() error {
