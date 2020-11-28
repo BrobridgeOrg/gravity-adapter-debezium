@@ -10,7 +10,6 @@ import (
 	kafka_connector "github.com/BrobridgeOrg/gravity-adapter-debezium/pkg/kafka-connector/service"
 	dsa "github.com/BrobridgeOrg/gravity-api/service/dsa"
 	parallel_chunked_flow "github.com/cfsghost/parallel-chunked-flow"
-	jsoniter "github.com/json-iterator/go"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 )
@@ -32,11 +31,10 @@ type Source struct {
 	adapter           *Adapter
 	kafkaConnector    *kafka_connector.Connector
 	debeziumConnector *debezium_connector.Connector
-	incoming          chan []byte
 	name              string
 	host              string
 	kafkaHosts        []string
-	tables            []string
+	tables            map[string]SourceTable
 	configs           map[string]interface{}
 	parser            *parallel_chunked_flow.ParallelChunkedFlow
 }
@@ -83,6 +81,15 @@ func NewSource(adapter *Adapter, name string, sourceInfo *SourceInfo) *Source {
 
 	info := sourceInfo
 
+	source := &Source{
+		adapter:    adapter,
+		name:       name,
+		host:       info.Host,
+		kafkaHosts: strings.Split(info.KafkaHosts, ","),
+		configs:    info.Configs,
+		tables:     info.Tables,
+	}
+
 	// Initialize parapllel chunked flow
 	pcfOpts := parallel_chunked_flow.Options{
 		BufferSize: 204800,
@@ -95,28 +102,16 @@ func NewSource(adapter *Adapter, name string, sourceInfo *SourceInfo) *Source {
 					log.Info(id)
 				}
 			*/
-			eventName := jsoniter.Get(data.([]byte), "event").ToString()
-			payload := jsoniter.Get(data.([]byte), "payload").ToString()
 
-			// Preparing request
-			request := requestPool.Get().(*dsa.PublishRequest)
-			request.EventName = eventName
-			request.Payload = StrToBytes(payload)
+			ce := data.(*ConsumerEvent)
 
-			output <- request
+			source.parseEvent(ce, output)
 		},
 	}
 
-	return &Source{
-		adapter:    adapter,
-		incoming:   make(chan []byte, 204800),
-		name:       name,
-		host:       info.Host,
-		kafkaHosts: strings.Split(info.KafkaHosts, ","),
-		configs:    info.Configs,
-		tables:     info.Tables,
-		parser:     parallel_chunked_flow.NewParallelChunkedFlow(&pcfOpts),
-	}
+	source.parser = parallel_chunked_flow.NewParallelChunkedFlow(&pcfOpts)
+
+	return source
 }
 
 func (source *Source) InitSubscription() error {
@@ -135,7 +130,7 @@ func (source *Source) InitSubscription() error {
 
 	// Preparing topics
 	topics := make([]string, 0, len(source.tables))
-	for _, tableName := range source.tables {
+	for tableName, _ := range source.tables {
 		topics = append(topics, databaseServerName+".public."+tableName)
 	}
 
@@ -143,7 +138,7 @@ func (source *Source) InitSubscription() error {
 
 	// Setup consumer
 	go func() {
-		consumer := NewConsumer()
+		consumer := NewConsumer(source)
 
 		for {
 			ctx := context.Background()
@@ -226,25 +221,81 @@ func (source *Source) Init() error {
 
 	source.debeziumConnector = dc
 
-	go source.eventReceiver()
 	go source.requestHandler()
 
 	return source.InitSubscription()
 }
 
-func (source *Source) eventReceiver() {
+func (source *Source) parseEvent(ce *ConsumerEvent, output chan interface{}) {
 
-	log.WithFields(log.Fields{
-		"source":      source.name,
-		"client_name": source.adapter.clientName + "-" + source.name,
-	}).Info("Initializing event receiver ...")
+	defer consumerEventPool.Put(ce)
+	defer ce.Session.MarkMessage(ce.Message, "")
 
-	for {
-		select {
-		case msg := <-source.incoming:
-			source.parser.Push(msg)
-		}
+	// Prepare event
+	event := eventPool.Get().(*Event)
+	defer eventPool.Put(event)
+
+	// Parsing event
+	err := json.Unmarshal(ce.Message.Value, event)
+	if err != nil {
+		log.Error(string(ce.Message.Value))
+		log.Error(err)
+		return
 	}
+
+	// Getting table information
+	tableInfo, ok := source.tables[event.Payload.Source.Table]
+	if !ok {
+		return
+	}
+
+	// Preparing request
+	request := requestPool.Get().(*dsa.PublishRequest)
+
+	switch event.Payload.Op {
+	case "c":
+		payload, err := json.Marshal(event.Payload.After)
+		if err != nil {
+			return
+		}
+
+		request.Payload = payload
+
+		if event.Payload.Source.IsSnapshot() {
+			request.EventName = tableInfo.Events.Snapshot
+		} else {
+			request.EventName = tableInfo.Events.Create
+		}
+	case "u":
+		payload, err := json.Marshal(event.Payload.After)
+		if err != nil {
+			return
+		}
+
+		request.Payload = payload
+		request.EventName = tableInfo.Events.Update
+	case "d":
+
+		data := make(map[string]interface{})
+		for key, value := range event.Payload.Before {
+
+			if value == nil {
+				continue
+			}
+
+			data[key] = value
+		}
+
+		payload, err := json.Marshal(data)
+		if err != nil {
+			return
+		}
+
+		request.EventName = tableInfo.Events.Delete
+		request.Payload = payload
+	}
+
+	output <- request
 }
 
 func (source *Source) requestHandler() {

@@ -17,9 +17,16 @@
 				"plugin.name": "pgoutput"
 			},
 			"kafka.hosts": "0.0.0.0:29092",
-			"tables": [
-				"datasource"
-			]
+			"tables": {
+				"datasource": {
+					"events": {
+						"snapshot": "accountInitialzed",
+						"create": "accountCreated",
+						"update": "accountUpdated",
+						"delete": "accountDeleted"
+					}
+				}
+			}
 		}
 	}
 }

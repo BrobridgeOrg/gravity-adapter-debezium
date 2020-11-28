@@ -1,18 +1,32 @@
 package adapter
 
 import (
+	"sync"
+
 	"github.com/Shopify/sarama"
-	log "github.com/sirupsen/logrus"
 )
+
+type ConsumerEvent struct {
+	Session sarama.ConsumerGroupSession
+	Message *sarama.ConsumerMessage
+}
+
+var consumerEventPool = sync.Pool{
+	New: func() interface{} {
+		return &ConsumerEvent{}
+	},
+}
 
 // Consumer represents a Sarama consumer group consumer
 type Consumer struct {
-	ready chan bool
+	source *Source
+	ready  chan bool
 }
 
-func NewConsumer() *Consumer {
+func NewConsumer(source *Source) *Consumer {
 	return &Consumer{
-		ready: make(chan bool),
+		source: source,
+		ready:  make(chan bool),
 	}
 }
 
@@ -32,9 +46,17 @@ func (consumer *Consumer) Cleanup(sarama.ConsumerGroupSession) error {
 func (consumer *Consumer) ConsumeClaim(session sarama.ConsumerGroupSession, claim sarama.ConsumerGroupClaim) error {
 
 	for message := range claim.Messages() {
-		log.Info(string(message.Value))
-		//		log.Printf("Message claimed: value = %s, timestamp = %v, topic = %s", string(message.Value), message.Timestamp, message.Topic)
-		session.MarkMessage(message, "")
+
+		if len(message.Value) == 0 {
+			session.MarkMessage(message, "")
+			continue
+		}
+
+		event := consumerEventPool.Get().(*ConsumerEvent)
+		event.Session = session
+		event.Message = message
+
+		consumer.source.parser.Push(event)
 	}
 
 	return nil

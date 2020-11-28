@@ -15,8 +15,19 @@ type SourceConfig struct {
 type SourceInfo struct {
 	Host       string                 `json:"host"`
 	KafkaHosts string                 `json:"kafka.hosts"`
-	Tables     []string               `json:"tables"`
+	Tables     map[string]SourceTable `json:"tables"`
 	Configs    map[string]interface{} `json:"configs"`
+}
+
+type SourceTable struct {
+	Events SourceTableEvents `json:"events"`
+}
+
+type SourceTableEvents struct {
+	Snapshot string `json:"snapshot"`
+	Create   string `json:"create"`
+	Update   string `json:"update"`
+	Delete   string `json:"delete"`
 }
 
 type SourceManager struct {
