@@ -2,6 +2,7 @@ package adapter
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"sync"
 	"unsafe"
@@ -34,6 +35,7 @@ type Source struct {
 	name              string
 	host              string
 	kafkaHosts        []string
+	schema            string
 	tables            map[string]SourceTable
 	configs           map[string]interface{}
 	parser            *parallel_chunked_flow.ParallelChunkedFlow
@@ -79,6 +81,15 @@ func NewSource(adapter *Adapter, name string, sourceInfo *SourceInfo) *Source {
 		return nil
 	}
 
+	connClass := sourceInfo.Configs["connector.class"]
+	schema := ""
+	switch {
+	case connClass == "io.debezium.connector.oracle.OracleConnector":
+		schema = fmt.Sprintf("%v", sourceInfo.Configs["database.schema"])
+	case connClass == "io.debezium.connector.postgresql.PostgresConnector":
+		schema = "public"
+	}
+
 	info := sourceInfo
 
 	source := &Source{
@@ -87,6 +98,7 @@ func NewSource(adapter *Adapter, name string, sourceInfo *SourceInfo) *Source {
 		host:       info.Host,
 		kafkaHosts: strings.Split(info.KafkaHosts, ","),
 		configs:    info.Configs,
+		schema:     schema,
 		tables:     info.Tables,
 	}
 
@@ -131,7 +143,7 @@ func (source *Source) InitSubscription() error {
 	// Preparing topics
 	topics := make([]string, 0, len(source.tables))
 	for tableName, _ := range source.tables {
-		topics = append(topics, databaseServerName+".public."+tableName)
+		topics = append(topics, databaseServerName+"."+source.schema+"."+tableName)
 	}
 
 	group := source.kafkaConnector.GetConsumerGroup()
@@ -139,9 +151,8 @@ func (source *Source) InitSubscription() error {
 	// Setup consumer
 	go func() {
 		consumer := NewConsumer(source)
-
+		ctx := context.Background()
 		for {
-			ctx := context.Background()
 			err := group.Consume(ctx, topics, consumer)
 			if err != nil {
 				log.Error(err)
@@ -217,6 +228,7 @@ func (source *Source) Init() error {
 	opts := debezium_connector.Options{
 		Name: source.name,
 	}
+
 	dc := debezium_connector.NewConnector(source.host, opts)
 
 	source.debeziumConnector = dc
@@ -245,6 +257,7 @@ func (source *Source) parseEvent(ce *ConsumerEvent, output chan interface{}) {
 
 	// Getting table information
 	tableInfo, ok := source.tables[event.Payload.Source.Table]
+
 	if !ok {
 		return
 	}
