@@ -20,20 +20,17 @@ var consumerEventPool = sync.Pool{
 // Consumer represents a Sarama consumer group consumer
 type Consumer struct {
 	source *Source
-	ready  chan bool
 }
 
 func NewConsumer(source *Source) *Consumer {
 	return &Consumer{
 		source: source,
-		ready:  make(chan bool),
 	}
 }
 
 // Setup is run at the beginning of a new session, before ConsumeClaim
 func (consumer *Consumer) Setup(sarama.ConsumerGroupSession) error {
 	// Mark the consumer as ready
-	close(consumer.ready)
 	return nil
 }
 
