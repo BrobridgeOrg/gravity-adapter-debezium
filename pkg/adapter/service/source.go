@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"time"
 	"unsafe"
 
 	debezium_connector "github.com/BrobridgeOrg/gravity-adapter-debezium/pkg/debezium-connector/service"
@@ -12,7 +13,6 @@ import (
 	dsa "github.com/BrobridgeOrg/gravity-api/service/dsa"
 	parallel_chunked_flow "github.com/cfsghost/parallel-chunked-flow"
 	log "github.com/sirupsen/logrus"
-	"google.golang.org/grpc"
 )
 
 var counter uint64
@@ -193,15 +193,6 @@ func (source *Source) InitDebezium() error {
 
 func (source *Source) Init() error {
 
-	// Initializing gRPC streams
-	p := source.adapter.app.GetGRPCPool()
-
-	// Register initializer for stream
-	p.SetStreamInitializer("publish", func(conn *grpc.ClientConn) (interface{}, error) {
-		client := dsa.NewDataSourceAdapterClient(conn)
-		return client.PublishEvents(context.Background())
-	})
-
 	// Connect to kafka for retriving events from debezium
 	log.WithFields(log.Fields{
 		"source": source.name,
@@ -329,14 +320,15 @@ func (source *Source) requestHandler() {
 
 func (source *Source) HandleRequest(request *dsa.PublishRequest) {
 
-	// Getting stream from pool
-	err := source.adapter.app.GetGRPCPool().GetStream("publish", func(s interface{}) error {
+	for {
+		connector := source.adapter.app.GetAdapterConnector()
+		err := connector.Publish(request.EventName, request.Payload, nil)
+		if err != nil {
+			log.Error(err)
+			time.Sleep(time.Second)
+			continue
+		}
 
-		// Send request
-		return s.(dsa.DataSourceAdapter_PublishEventsClient).Send(request)
-	})
-	if err != nil {
-		log.Error("Failed to get available stream:", err)
-		return
+		break
 	}
 }
