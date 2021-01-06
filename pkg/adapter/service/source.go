@@ -297,6 +297,14 @@ func (source *Source) parseEvent(ce *ConsumerEvent, output chan interface{}) {
 
 		request.EventName = tableInfo.Events.Delete
 		request.Payload = payload
+	case "r":
+		payload, err := json.Marshal(event.Payload.After)
+		if err != nil {
+			return
+		}
+
+		request.Payload = payload
+		request.EventName = tableInfo.Events.Create
 	}
 
 	output <- request
