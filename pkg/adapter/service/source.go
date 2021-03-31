@@ -107,7 +107,7 @@ func NewSource(adapter *Adapter, name string, sourceInfo *SourceInfo) *Source {
 		BufferSize: 204800,
 		ChunkSize:  512,
 		ChunkCount: 512,
-		Handler: func(data interface{}, output chan interface{}) {
+		Handler: func(data interface{}, output func(interface{})) {
 			/*
 				id := atomic.AddUint64((*uint64)(&counter), 1)
 				if id%1000 == 0 {
@@ -229,7 +229,7 @@ func (source *Source) Init() error {
 	return source.InitSubscription()
 }
 
-func (source *Source) parseEvent(ce *ConsumerEvent, output chan interface{}) {
+func (source *Source) parseEvent(ce *ConsumerEvent, output func(interface{})) {
 
 	defer consumerEventPool.Put(ce)
 	defer ce.Session.MarkMessage(ce.Message, "")
@@ -307,7 +307,12 @@ func (source *Source) parseEvent(ce *ConsumerEvent, output chan interface{}) {
 		request.EventName = tableInfo.Events.Create
 	}
 
-	output <- request
+	//check
+	if request.EventName == "" {
+		return
+	}
+
+	output(request)
 }
 
 func (source *Source) requestHandler() {
