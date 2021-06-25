@@ -1,4 +1,5 @@
 [gravity]
+domain = "gravity"
 host = "0.0.0.0"
 port = 32803
 pingInterval = 10

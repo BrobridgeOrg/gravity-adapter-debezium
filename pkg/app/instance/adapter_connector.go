@@ -19,11 +19,13 @@ const (
 func (a *AppInstance) initAdapterConnector() error {
 
 	// default settings
+	viper.SetDefault("gravity.domain", "gravity")
 	viper.SetDefault("gravity.pingInterval", DefaultPingInterval)
 	viper.SetDefault("gravity.maxPingsOutstanding", DefaultMaxPingsOutstanding)
 	viper.SetDefault("gravity.maxReconnects", DefaultMaxReconnects)
 
 	// Read configs
+	domain := viper.GetString("gravity.domain")
 	host := viper.GetString("gravity.host")
 	port := viper.GetInt("gravity.port")
 	pingInterval := viper.GetInt64("gravity.pingInterval")
@@ -54,6 +56,7 @@ func (a *AppInstance) initAdapterConnector() error {
 
 	// Initializing gravity adapter connector
 	opts := gravity_adapter.NewOptions()
+	opts.Domain = domain
 	a.adapterConnector = gravity_adapter.NewAdapterConnectorWithClient(client, opts)
 
 	// Register adapter
