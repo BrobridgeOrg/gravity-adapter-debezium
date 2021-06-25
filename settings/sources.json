@@ -1,24 +1,30 @@
 {
 	"sources": {
 		"debezium": {
-			"host": "0.0.0.0:8083",
+			"host": "192.168.1.221:31563",
 			"configs": {
-				"connector.class": "io.debezium.connector.postgresql.PostgresConnector",
+				"connector.class": "io.debezium.connector.oracle.OracleConnector",
 				"tasks.max": "1",
-				"database.hostname": "docker.for.mac.host.internal",
-				"database.port": "32768",
-				"database.dbname": "gravity",
-				"database.user": "postgres",
-				"database.password": "1qazXSW@",
-				"database.server.name" : "postgres_6",
-				"snapshot.mode": "exported",
-				"snapshot.delay.ms": 100,
-				"table.include.list": "public.datasource",
-				"plugin.name": "pgoutput"
+				"database.hostname": "192.168.1.111",
+				"database.port": "1521",
+				"database.dbname": "orcl",
+				"database.user": "brobridge",
+				"database.password": "123456",
+				"database.server.name" : "oracle_002",
+				"database.out.server.name" : "dbzxout",
+				"database.history.kafka.bootstrap.servers" : "192.168.1.221:30444",
+				"database.history.kafka.topic": "oracle_002.public.employee_info",
+				"database.schema": "GRAVITY",
+				"database.connection.adapter": "logminer",
+				"database.tablename.case.insensitive": "true",
+				"database.oracle.version": "11"
+
+
+				
 			},
-			"kafka.hosts": "0.0.0.0:29092",
+			"kafka.hosts": "192.168.1.221:30444",
 			"tables": {
-				"datasource": {
+				"employee_info": {
 					"events": {
 						"snapshot": "accountInitialzed",
 						"create": "accountCreated",

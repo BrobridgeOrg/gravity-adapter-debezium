@@ -1,5 +1,13 @@
-[dsa]
-host = "0.0.0.0:32803"
+[gravity]
+host = "0.0.0.0"
+port = 32803
+pingInterval = 10
+maxPingsOutstanding = 3
+maxReconnects = -1
+
+[adapter]
+adapter_id = "debezium_adapter"
+adapter_name = "Debezium Adapter"
 
 [source]
 config = "./settings/sources.json"
