@@ -60,8 +60,8 @@ func (a *AppInstance) initAdapterConnector() error {
 	a.adapterConnector = gravity_adapter.NewAdapterConnectorWithClient(client, opts)
 
 	// Register adapter
-	adapterID := viper.GetString("adapter.adapter_id")
-	adapterName := viper.GetString("adapter.adapter_name")
+	adapterID := viper.GetString("adapter.adapterId")
+	adapterName := viper.GetString("adapter.adapterName")
 
 	log.WithFields(log.Fields{
 		"id":   adapterID,
