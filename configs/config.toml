@@ -7,7 +7,7 @@ maxPingsOutstanding = 3
 maxReconnects = -1
 
 [adapter]
-adapterId = "debezium_adapter"
+adapterID = "debezium_adapter"
 adapterName = "Debezium Adapter"
 
 [source]
