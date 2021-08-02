@@ -6,6 +6,7 @@ import (
 
 	gravity_adapter "github.com/BrobridgeOrg/gravity-sdk/adapter"
 	"github.com/BrobridgeOrg/gravity-sdk/core"
+	"github.com/BrobridgeOrg/gravity-sdk/core/keyring"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
@@ -57,6 +58,12 @@ func (a *AppInstance) initAdapterConnector() error {
 	// Initializing gravity adapter connector
 	opts := gravity_adapter.NewOptions()
 	opts.Domain = domain
+
+	// Loading access key
+	viper.SetDefault("adapter.appID", "anonymous")
+	viper.SetDefault("adapter.accessKey", "")
+	opts.Key = keyring.NewKey(viper.GetString("adapter.appID"), viper.GetString("adapter.accessKey"))
+
 	a.adapterConnector = gravity_adapter.NewAdapterConnectorWithClient(client, opts)
 
 	// Register adapter

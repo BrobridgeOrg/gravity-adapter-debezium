@@ -10,5 +10,9 @@ maxReconnects = -1
 adapterID = "debezium_adapter"
 adapterName = "Debezium Adapter"
 
+# Authentication
+appID = "anonymous"
+accessKey = ""
+
 [source]
 config = "./settings/sources.json"
