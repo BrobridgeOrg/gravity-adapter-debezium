@@ -3,7 +3,7 @@ module github.com/BrobridgeOrg/gravity-adapter-debezium
 go 1.15
 
 require (
-	github.com/BrobridgeOrg/gravity-sdk v0.0.34
+	github.com/BrobridgeOrg/gravity-sdk v0.0.38
 	github.com/Shopify/sarama v1.27.2
 	github.com/cfsghost/parallel-chunked-flow v0.0.6
 	github.com/json-iterator/go v1.1.10
